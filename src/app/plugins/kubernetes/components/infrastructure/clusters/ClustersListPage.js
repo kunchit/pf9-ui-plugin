@@ -193,7 +193,7 @@ export const options = {
       cond: both(isAdmin, canScaleWorkers) || both(isAdmin, canScaleMasters),
       icon: <TuneIcon />,
       label: 'Adjust nodes',
-      routeTo: rows => `/ui/kubernetes/infrastructure/clusters/adjust/${rows[0].uuid}`,
+      routeTo: rows => routes.cluster.adjust.path({ id: rows[0].uuid }),
     },
     {
       cond: both(isAdmin, canUpgradeCluster),

@@ -56,6 +56,7 @@ export const routes = {
   cluster: {
     list: new Route(`${k8sPrefix}/infrastructure#clusters`),
     edit: new Route<{id: string}>(`${k8sPrefix}/infrastructure/clusters/edit/:id`),
+    adjust: new Route<{id: string}>(`${k8sPrefix}/infrastructure/clusters/adjust/:id`),
     detail: new Route<{id: string}>(`${k8sPrefix}/infrastructure/clusters/:id#clusterDetails`),
     nodes: new Route<{id: string}>(`${k8sPrefix}/infrastructure/clusters/:id#nodes`),
     convergingNodes: new Route<{id: string}>(`${k8sPrefix}/infrastructure/clusters/:id#convergingNodes`),

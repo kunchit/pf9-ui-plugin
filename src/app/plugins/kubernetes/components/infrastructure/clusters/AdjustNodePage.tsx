@@ -2,8 +2,6 @@ import React from 'react'
 import useReactRouter from 'use-react-router'
 import ValidatedForm from 'core/components/validatedForm/ValidatedForm'
 import FormWrapper from 'core/components/FormWrapper'
-import { k8sPrefix } from 'app/constants'
-import { pathJoin } from 'utils/misc'
 import useDataUpdater from 'core/hooks/useDataUpdater'
 import useDataLoader from 'core/hooks/useDataLoader'
 import { Radio, RadioGroup, FormControlLabel, FormControl, Typography, makeStyles, Theme } from '@material-ui/core'
@@ -16,9 +14,10 @@ import ClusterHostChooser, {
 } from './bareos/ClusterHostChooser'
 import { allPass } from 'ramda'
 import TextField from 'core/components/validatedForm/TextField'
-import { validators, customValidator } from 'core/utils/fieldValidators'
-import { CloudProviders, ICluster } from './model'
+import { validators, minWorkerNodeValidator, maxWorkerNodeValidator } from 'core/utils/fieldValidators'
+import { CloudProviders, ICluster, CloudProvidersFriendlyName } from './model'
 import { FormFieldCard } from 'core/components/validatedForm/FormFieldCard'
+import { routes } from 'core/utils/routes'
 
 type NodeType = 'master' | 'worker'
 type ScaleType = 'up' | 'down'
@@ -87,7 +86,7 @@ const useStyles = makeStyles<Theme>((theme) => ({
   }
 }))
 
-const listUrl = pathJoin(k8sPrefix, 'infrastructure')
+const listUrl: string = routes.cluster.list.path()
 
 // Limit the number of workers that can be scaled at a time to prevent overload
 const MAX_SCALE_AT_A_TIME = 15
@@ -98,20 +97,12 @@ const calcMin = (value: number, scaleType: ScaleType): number =>
 const calcMax = (value: number, scaleType: ScaleType): number =>
   scaleType === 'up' ? value + MAX_SCALE_AT_A_TIME : value
 
-const maxScaleValidator = customValidator(
-  (selections) => selections.length <= MAX_SCALE_AT_A_TIME,
-  `Clusters can only be scaled up to ${MAX_SCALE_AT_A_TIME} nodes at a time.`
-)
-
-const minScaleValidator = customValidator(
-  (selections) => selections.length > 0,
-  'You must select at least 1 node.'
-)
+const minMaxValidator = [minWorkerNodeValidator(0), maxWorkerNodeValidator(MAX_SCALE_AT_A_TIME)]
 
 const clusterTypeDisplay = {
-  local: 'BareOS',
-  aws: 'AWS',
-  azure: 'Azure',
+  local: CloudProvidersFriendlyName.local,
+  aws: CloudProvidersFriendlyName.aws,
+  azure: CloudProvidersFriendlyName.azure
 }
 
 const canScaleMasters = (cluster) => cluster.taskStatus === 'success' && cluster.cloudProviderType === CloudProviders.BareOS && (cluster.nodes || []).length > 1
@@ -206,7 +197,7 @@ const ScaleNodeListPicker: React.FC<IScaleNodeListPickerProps> = ({ scaleType, n
       {canScaleWorker && relation === 'warn' && <Alert message={message} variant="warning" />}
       {canScaleWorker &&
         <div className={classes.tableWidth}>
-          <ClusterHostChooser id='nodesToUpdate' filterFn={getNodeFilter} validations={[minScaleValidator, maxScaleValidator]} required multiple pollForNodes />
+          <ClusterHostChooser id='nodesToUpdate' filterFn={getNodeFilter} validations={minMaxValidator} required multiple pollForNodes />
         </div>
       }
     </>)
@@ -217,8 +208,8 @@ const ScaleNodeListPicker: React.FC<IScaleNodeListPickerProps> = ({ scaleType, n
   if (!canScaleMasters(cluster)) return <Alert message="Scale master operation is not valid for this cluster. Please check your cluster status and the number of master nodes are valid" variant="error" />
 
   return (<div className={classes.tableWidth}>
-      <ClusterHostChooser id='nodesToUpdate' filterFn={getNodeFilter} required multiple pollForNodes />
-    </div>
+    <ClusterHostChooser id='nodesToUpdate' filterFn={getNodeFilter} required multiple pollForNodes />
+  </div>
   )
 }
 
