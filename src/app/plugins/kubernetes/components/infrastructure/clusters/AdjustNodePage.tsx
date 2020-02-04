@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useCallback } from 'react'
 import useReactRouter from 'use-react-router'
 import ValidatedForm from 'core/components/validatedForm/ValidatedForm'
 import FormWrapper from 'core/components/FormWrapper'
@@ -21,15 +21,13 @@ import { routes } from 'core/utils/routes'
 
 type NodeType = 'master' | 'worker'
 type ScaleType = 'up' | 'down'
-
-type ActionButtonLabel = 'Add Master' | 'Add Worker' | 'Remove Master' | 'Remove Worker'
-type FGetButtonLabel = (scaleType: ScaleType, nodeType: NodeType) => ActionButtonLabel
-type FHandleSubmit = (data: { nodesToUpdate: string[] }) => void
+type IHandleSubmit = (data: { nodesToUpdate: string[] }) => any
 
 interface IInitialState {
   nodeType: NodeType
   scaleType: ScaleType
 }
+
 interface IConstraint {
   startNum: number
   desiredNum: number
@@ -47,11 +45,6 @@ interface INodeTypeRadioGroupProps {
   handleNodeTypeChange: (key: string) => any
 }
 
-const initialState: IInitialState = {
-  nodeType: 'worker',
-  scaleType: 'up'
-}
-
 interface IScaleNodeListPickerProps {
   transition: IConstraint
   nodeType: NodeType
@@ -59,6 +52,19 @@ interface IScaleNodeListPickerProps {
   cluster: ICluster
 }
 
+enum SubmitButtonLabel {
+  'up-master' = 'Add Master',
+  'down-master' = 'Remove Master',
+  'up-worker' = 'Add Worker',
+  'down-worker' = 'Remove Worker',
+}
+
+const initialState: IInitialState = {
+  nodeType: 'worker',
+  scaleType: 'up'
+}
+
+const validatorsAny = validators as any
 const useStyles = makeStyles<Theme>((theme) => ({
   root: {
     marginTop: theme.spacing(4),
@@ -111,25 +117,67 @@ const canScaleWorkers = (cluster) => cluster.taskStatus === 'success' && cluster
 // To eliminate excessive branching logic, an explicit state transition table is used.
 const scaleConstraints: IConstraint[] = [
   // shrink
-  { startNum: 1, desiredNum: 0, relation: 'deny', message: 'You cannot remove master node from a single master cluster.  If you wish to delete the cluster, please choose the ‘delete’ operation on the cluster on the infrastructure page instead.' },
-  { startNum: 2, desiredNum: 1, relation: 'warn', message: 'Removing this master node will reduce the total number of masters in this cluster down to 1.  For cluster high availability we recommend always having 3 masters nodes in a cluster.' },
-  { startNum: 3, desiredNum: 2, relation: 'warn', message: 'For high availability, we recommend having at least 3 masters in a cluster at any time. Removing this master will result in an even number of masters for this cluster (2 master nodes after removal of this node).  We recommend having an odd number of masters for your cluster at any time.' },
+  {
+    startNum: 1,
+    desiredNum: 0,
+    relation: 'deny',
+    message: 'You cannot remove master node from a single master cluster. If you wish to delete ' +
+      'the cluster, please choose the ‘delete’ operation on the cluster on the infrastructure ' +
+      'page instead.',
+  },
+  {
+    startNum: 2,
+    desiredNum: 1,
+    relation: 'warn',
+    message: 'Removing this master node will reduce the total number of masters in this cluster ' +
+      'down to 1. For cluster high availability we recommend always having 3 masters nodes in ' +
+      'a cluster.',
+  },
+  {
+    startNum: 3,
+    desiredNum: 2,
+    relation: 'warn',
+    message: 'For high availability, we recommend having at least 3 masters in a cluster at any ' +
+      'time. Removing this master will result in an even number of masters for this cluster (2 ' +
+      'master nodes after removal of this node). We recommend having an odd number of masters ' +
+      'for your cluster at any time.',
+  },
   { startNum: 4, desiredNum: 3, relation: 'allow', message: '' },
-  { startNum: 5, desiredNum: 4, relation: 'warn', message: 'Removing this master node will result in an even number of master nodes for this cluster (4 master nodes after removal of this node).  We recommend having an odd number of masters for your cluster at any time.' },
+  {
+    startNum: 5,
+    desiredNum: 4,
+    relation: 'warn',
+    message: 'Removing this master node will result in an even number of master nodes for this ' +
+      'cluster (4 master nodes after removal of this node). We recommend having an odd number ' +
+      'of masters for your cluster at any time.',
+  },
 
   // grow
-  { startNum: 1, desiredNum: 2, relation: 'deny', message: 'You cannot add master nodes to a single master cluster.  You need to create a multi-master cluster with at least 2 masters before you can add more masters to the cluster.' },
+  {
+    startNum: 1,
+    desiredNum: 2,
+    relation: 'deny',
+    message: 'You cannot add master nodes to a single master cluster.  You need to create a ' +
+      'multi-master cluster with at least 2 masters before you can add more masters to the ' +
+      'cluster.',
+  },
   { startNum: 2, desiredNum: 3, relation: 'allow', message: '' },
-  { startNum: 3, desiredNum: 4, relation: 'warn', message: 'Adding this master node will result in an even number of master nodes for this cluster (4 master nodes after adding of this node).  We recommend having an odd number of masters for your cluster at any time.' },
+  {
+    startNum: 3,
+    desiredNum: 4,
+    relation: 'warn',
+    message: 'Adding this master node will result in an even number of master nodes for this ' +
+      'cluster (4 master nodes after adding of this node). We recommend having an odd number of ' +
+      'masters for your cluster at any time.',
+  },
   { startNum: 4, desiredNum: 5, relation: 'allow', message: '' },
-  { startNum: 5, desiredNum: 6, relation: 'deny', message: '5 master nodes is the max.  You cannot add more.' },
+  {
+    startNum: 5,
+    desiredNum: 6,
+    relation: 'deny',
+    message: '5 master nodes is the max.  You cannot add more.',
+  },
 ]
-
-const getButtonLabel: FGetButtonLabel = (scaleType, nodeType) => {
-  if (scaleType === 'up') return nodeType === 'master' ? 'Add Master' : 'Add Worker'
-
-  return nodeType === 'master' ? 'Remove Master' : 'Remove Worker'
-}
 
 const isMaster = node => node.isMaster === 1 // Backend returns integer 0 and 1 instead of true and false
 
@@ -143,73 +191,79 @@ const ScaleNodeListPicker: React.FC<IScaleNodeListPickerProps> = ({ scaleType, n
   const getNodeFilter = scaleType === 'up' ? isUnassignedNode : allPass([isNotMaster, inCluster(cluster.uuid)])
 
   if (nodeType === 'worker') {
-    return (<>
-      {!isLocal &&
-        <>
-          <div>
-            <Typography variant="subtitle1">
-              Scale worker nodes for cluster <b>{name}</b> of type <i>{type}</i>
-            </Typography>
-          </div>
-          <div className={classes.workerCount}>
-            <Typography variant="subtitle1">You currently have <b>{cluster.numWorkers}</b> worker nodes.</Typography>
-          </div>
-          <div className={classes.inputWidth}>
-            {!cluster.enableCAS &&
-              <TextField
-                id="numWorkers"
-                type="number"
-                label="Number of worker nodes"
-                info="Number of worker nodes to deploy."
-                required
-                validations={[
-                  validators.rangeValue(calcMin(cluster.numWorkers, scaleType), calcMax(cluster.numWorkers, scaleType)),
-                ]}
-              />
-            }
-            {!!cluster.enableCAS &&
-              <>
+    return (
+      <>
+        {!isLocal &&
+          <>
+            <div>
+              <Typography variant="subtitle1">
+                Scale worker nodes for cluster <b>{name}</b> of type <i>{type}</i>
+              </Typography>
+            </div>
+            <div className={classes.workerCount}>
+              <Typography variant="subtitle1">You currently have <b>{cluster.numWorkers}</b> worker nodes.</Typography>
+            </div>
+            <div className={classes.inputWidth}>
+              {!cluster.enableCAS &&
                 <TextField
-                  id="numMinWorkers"
+                  id="numWorkers"
                   type="number"
-                  label="Minimum number of worker nodes"
-                  info="Minimum number of worker nodes this cluster may be scaled down to."
-                  validations={[
-                    validators.rangeValue(calcMin(cluster.numMinWorkers, scaleType), calcMax(cluster.numMinWorkers, scaleType)),
-                  ]}
+                  label="Number of worker nodes"
+                  info="Number of worker nodes to deploy."
                   required
-                />
-                <TextField
-                  id="numMaxWorkers"
-                  type="number"
-                  label="Maximum number of worker nodes"
-                  info="Maximum number of worker nodes this cluster may be scaled up to."
                   validations={[
-                    validators.rangeValue(calcMin(cluster.numMaxWorkers, scaleType), calcMax(cluster.numMaxWorkers, scaleType)),
+                    validatorsAny.rangeValue(calcMin(cluster.numWorkers, scaleType), calcMax(cluster.numWorkers, scaleType)),
                   ]}
-                  required
                 />
-              </>
-            }
+              }
+              {!!cluster.enableCAS &&
+                <>
+                  <TextField
+                    id="numMinWorkers"
+                    type="number"
+                    label="Minimum number of worker nodes"
+                    info="Minimum number of worker nodes this cluster may be scaled down to."
+                    validations={[
+                      validatorsAny.rangeValue(calcMin(cluster.numMinWorkers, scaleType), calcMax(cluster.numMinWorkers, scaleType)),
+                    ]}
+                    required
+                  />
+                  <TextField
+                    id="numMaxWorkers"
+                    type="number"
+                    label="Maximum number of worker nodes"
+                    info="Maximum number of worker nodes this cluster may be scaled up to."
+                    validations={[
+                      validatorsAny.rangeValue(calcMin(cluster.numMaxWorkers, scaleType), calcMax(cluster.numMaxWorkers, scaleType)),
+                    ]}
+                    required
+                  />
+                </>
+              }
+            </div>
+          </>
+        }
+        {canScaleWorker && relation === 'warn' && <Alert small message={message} variant="warning" />}
+        {canScaleWorker &&
+          <div className={classes.tableWidth}>
+            <ClusterHostChooser id='nodesToUpdate' required multiple pollForNodes filterFn={getNodeFilter} validations={minMaxValidator} />
           </div>
-        </>
-      }
-      {canScaleWorker && relation === 'warn' && <Alert message={message} variant="warning" />}
-      {canScaleWorker &&
-        <div className={classes.tableWidth}>
-          <ClusterHostChooser id='nodesToUpdate' filterFn={getNodeFilter} validations={minMaxValidator} required multiple pollForNodes />
-        </div>
-      }
-    </>)
+        }
+      </>)
   }
 
-  if (relation === 'deny') return <Alert message={message} variant="error" />
+  if (relation === 'deny') {
+    return <Alert small message={message} variant="error" />
+  }
 
-  if (!canScaleMasters(cluster)) return <Alert message="Scale master operation is not valid for this cluster. Please check your cluster status and the number of master nodes are valid" variant="error" />
+  if (!canScaleMasters(cluster)) {
+    return <Alert small message="Scale master operation is not valid for this cluster. Please check your cluster status and the number of master nodes are valid" variant="error" />
+  }
 
-  return (<div className={classes.tableWidth}>
-    <ClusterHostChooser id='nodesToUpdate' filterFn={getNodeFilter} required multiple pollForNodes />
-  </div>
+  return (
+    <div className={classes.tableWidth}>
+      <ClusterHostChooser id='nodesToUpdate' filterFn={getNodeFilter} required multiple pollForNodes />
+    </div>
   )
 }
 
@@ -257,7 +311,7 @@ const AdjustNodePage: React.FC<{}> = () => {
   const { params, updateParams } = useParams(initialState)
   const { match, history } = useReactRouter()
   const classes = useStyles({})
-  const onComplete = () => history.push(listUrl)
+  const onComplete = (success) => success && history.push(listUrl)
   const { nodeType, scaleType } = params
 
   const [clusters, loading] = useDataLoader(clusterActions.list)
@@ -280,21 +334,26 @@ const AdjustNodePage: React.FC<{}> = () => {
     await update({ ...cluster, ...data })
   }
 
-  const handleSubmit: FHandleSubmit = (data) => {
+  const handleSubmit: IHandleSubmit = async (data) => {
     if (!isLocal) {
       return handleUpdateCluster(data)
     }
 
     const uuids = data.nodesToUpdate
 
-    if (scaleType === 'down') return detach({ cluster, nodes: uuids })
+    if (scaleType === 'down') {
+      return detach({ cluster, nodes: uuids })
+    }
 
-    const isMaster = nodeType === 'master' || false
+    const isMaster = nodeType === 'master'
     const nodes = uuids.map((uuid) => ({ uuid, isMaster }))
     attach({ cluster, nodes })
   }
 
-  const handleChange = key => e => updateParams({ [key]: e.target.value })
+  const handleChange = useCallback(
+    (key) => e => updateParams({ [key]: e.target.value }),
+    [params.nodeType || params.scaleType],
+  )
 
   const canSubmit = nodeType === 'master' ? canScaleMasters(cluster) && transition.relation !== 'deny' : canScaleWorkers(cluster)
 
@@ -313,7 +372,7 @@ const AdjustNodePage: React.FC<{}> = () => {
             </FormControl>
           </FormFieldCard>
           <div className={classes.submit}>
-            {canSubmit && <SubmitButton>{getButtonLabel(scaleType, nodeType)}</SubmitButton>}
+            {canSubmit && <SubmitButton>{SubmitButtonLabel[`${scaleType}-${nodeType}`]}</SubmitButton>}
           </div>
         </div>
       </ValidatedForm>

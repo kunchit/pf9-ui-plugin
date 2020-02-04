@@ -34,18 +34,18 @@ export const masterNodeLengthValidator = new FieldValidator(
 )
 
 export const minWorkerNodeValidator = moize(
-  (min, message) =>
+  min =>
     new FieldValidator(
-      (nodes) => fieldIsUnset(nodes) || nodes.length >= min,
-      message || `You must select at least ${min} node.`,
+      nodes => fieldIsUnset(nodes) || nodes.length >= min,
+      `You must select at least ${min} node.`,
     ),
 )
 
 export const maxWorkerNodeValidator = moize(
-  (max, message) =>
+  max =>
     new FieldValidator(
-      (nodes) => fieldIsUnset(nodes) || nodes.length <= max,
-      message || `Clusters can only be scaled up to ${max} nodes at a time.`
+      nodes => fieldIsUnset(nodes) || nodes.length <= max,
+      `Clusters can only be scaled up to ${max} nodes at a time.`
     ),
 )
 

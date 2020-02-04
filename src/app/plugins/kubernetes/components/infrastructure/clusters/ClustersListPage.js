@@ -3,7 +3,6 @@ import DownloadKubeConfigLink from './DownloadKubeConfigLink'
 // import KubeCLI from './KubeCLI' // commented out till we support cli links
 import ExternalLink from 'core/components/ExternalLink'
 import SimpleLink from 'core/components/SimpleLink'
-import ScaleIcon from '@material-ui/icons/TrendingUp'
 import UpgradeIcon from '@material-ui/icons/PresentToAll'
 import SeeDetailsIcon from '@material-ui/icons/Subject'
 import TuneIcon from '@material-ui/icons/Tune'
@@ -16,7 +15,7 @@ import ResourceUsageTable from 'k8s/components/infrastructure/common/ResourceUsa
 import DashboardLink from './DashboardLink'
 import CreateButton from 'core/components/buttons/CreateButton'
 import { AppContext } from 'core/providers/AppProvider'
-import { both } from 'ramda'
+import { both, either } from 'ramda'
 import PrometheusAddonDialog from 'k8s/components/prometheus/PrometheusAddonDialog'
 import ClusterUpgradeDialog from 'k8s/components/infrastructure/clusters/ClusterUpgradeDialog'
 import ClusterDeleteDialog from './ClusterDeleteDialog'
@@ -190,8 +189,8 @@ export const options = {
       routeTo: rows => `/ui/kubernetes/infrastructure/clusters/${rows[0].uuid}`,
     },
     {
-      cond: both(isAdmin, canScaleWorkers) || both(isAdmin, canScaleMasters),
       icon: <TuneIcon />,
+      cond: both(isAdmin, either(canScaleWorkers, canScaleMasters)),
       label: 'Adjust nodes',
       routeTo: rows => routes.cluster.adjust.path({ id: rows[0].uuid }),
     },

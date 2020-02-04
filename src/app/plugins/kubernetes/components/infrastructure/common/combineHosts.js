@@ -34,7 +34,7 @@ export const annotateCloudStack = host => {
 
 export const annotateResmgrFields = host => {
   const { resmgr } = host
-  if (!resmgr) return null
+  if (!resmgr) return {}
   return {
     ...host,
     id: resmgr.id,
@@ -53,7 +53,7 @@ export const annotateResmgrFields = host => {
 }
 
 export const annotateUiState = host => {
-  if (!host) return null
+  if (!host) return {}
   const { resmgr } = host
 
   /* TODO:
