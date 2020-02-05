@@ -58,7 +58,7 @@ const renderLinks = links => {
 
 const renderNodeLink = ({ uuid, name }) => (
   <div key={uuid}>
-    <SimpleLink src={`/ui/kubernetes/infrastructure/nodes/${uuid}`}>
+    <SimpleLink src={`/ui/kubernetes/infrastructure/nodes/${uuid}?clusterList`}>
       {name}
     </SimpleLink>
   </div>

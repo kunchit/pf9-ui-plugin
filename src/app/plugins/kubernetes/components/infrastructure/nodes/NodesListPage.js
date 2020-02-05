@@ -103,8 +103,19 @@ const getSpotInstance = pipe(
   castFuzzyBool,
   castBoolToStr(),
 )
-const renderNodeDetailLink = (name, node) =>
-  <SimpleLink src={`/ui/kubernetes/infrastructure/nodes/${node.uuid}`}>{name}</SimpleLink>
+
+const formSearchQuery = (node, source) => {
+  if (source === 'clusterDetailsNode') {
+    return `${source}=${node.clusterUuid}`
+  }
+
+  return 'nodeList'
+}
+
+const renderNodeDetailLink = (name, node, source) => {
+  const searchQuery = formSearchQuery(node, source)
+  return <SimpleLink src={`/ui/kubernetes/infrastructure/nodes/${node.uuid}?${searchQuery}`}>{name}</SimpleLink>
+}
 
 const renderClusterLink = (clusterName, { clusterUuid }) => clusterUuid &&
   <SimpleLink src={`/ui/kubernetes/infrastructure/clusters/${clusterUuid}`}>{clusterName}</SimpleLink>
